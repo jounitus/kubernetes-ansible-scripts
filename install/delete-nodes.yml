@@ -1,0 +1,86 @@
+#
+# https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/#tear-down
+#
+
+- hosts: kube-nodes
+  tasks:
+
+  #
+  # first, drain and delete slaves with kubectl from the master
+  #
+
+  - name: debug stuff
+    
+    debug:
+      msg: "lol {{ hostvars[item]['ansible_facts']['hostname']  }}"
+    loop: "{{ groups['kube-slaves'] }}"
+    when: inventory_hostname in groups['kube-master']
+
+
+  - name: drain slaves
+
+    command: "kubectl drain {{ hostvars[item]['ansible_facts']['hostname']  }} --delete-local-data --force --ignore-daemonsets"
+    #loop: "{{ groups['kube-slaves'] }}"
+    loop: "{{ groups['kube-nodes'] }}"
+    register: drain_output
+    when: inventory_hostname in groups['kube-master']
+    failed_when: "drain_output.rc != 0 and not (drain_output.msg and '[Errno 2] No such file or directory' in drain_output.msg)"
+    changed_when: "drain_output.rc == 0"
+
+  - name: delete slaves
+
+    command: "kubectl delete node {{ hostvars[item]['ansible_facts']['hostname']  }}"
+    #loop: "{{ groups['kube-slaves'] }}"
+    loop: "{{ groups['kube-nodes'] }}"
+    register: delete_output
+    when: inventory_hostname in groups['kube-master']
+    failed_when: "delete_output.rc != 0 
+        and not ('stderr' in delete_output and 'NotFound' in delete_output.stderr)
+        and not ('msg' in delete_output and '[Errno 2] No such file or directory' in delete_output.msg)"
+    changed_when: "delete_output.rc == 0"
+
+  - name: run kubeadm reset on slaves
+    command: kubeadm reset -f  # -f means force / don't prompt for confirmation
+    register: reset_output
+    #when: inventory_hostname in groups['kube-slaves']
+    failed_when: "reset_output.rc != 0 
+        and not ('msg' in reset_output and '[Errno 2] No such file or directory' in reset_output.msg)
+        "
+
+  - name: clear ip tabless on slaves
+    shell: "iptables -F && iptables -t nat -F && iptables -t mangle -F && iptables -X"
+    #when: inventory_hostname in groups['kube-slaves']
+
+  - name: see which network interfaces still exists
+    command: ip link
+    register: ip_output
+    changed_when: false
+
+  - name: clear flannel etc network interfaces
+    shell: "ip link delete cni0"
+    #when: inventory_hostname in groups['kube-slaves'] and 'cni0' in ip_output.stdout
+    when: "'cni0' in ip_output.stdout"
+
+  - name: clear flannel etc network interfaces
+    shell: "ip link delete flannel.1"
+    #when: inventory_hostname in groups['kube-slaves'] and 'flannel.1' in ip_output.stdout
+    when: "'flannel.1' in ip_output.stdout"
+     
+  - name: remove kubernetes packages
+    apt:
+      name: "{{ packages }}"
+      state: absent
+    vars:
+      packages:
+      - kubelet
+      - kubeadm
+      - kubectl
+
+  - name: delete files and directories
+    file:
+      path: "{{ item }}"
+      state: absent
+    loop:
+    - /root/.kube
+    - /etc/kubernetes
+

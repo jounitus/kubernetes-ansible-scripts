@@ -1,0 +1,18 @@
+# Instructions: https://kubernetes.io/docs/setup/independent/install-kubeadm/
+
+- hosts: kube-slaves
+  tasks:
+
+  - name: test if /etc/kubernetes/kubelet.conf exists
+    stat:
+      path: /etc/kubernetes/kubelet.conf
+    register: kubelet_conf
+  - name: install kubeadm
+    block:
+    - name: run kubeadm join 
+      command: 'kubeadm join --discovery-token-unsafe-skip-ca-verification
+        --token={{kubeadm_token}}
+        {{groups["kube-master"][0]}}:6443
+        '
+    when: not kubelet_conf.stat.exists
+

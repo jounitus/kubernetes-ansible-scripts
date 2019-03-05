@@ -1,0 +1,48 @@
+[all:vars]
+ansible_python_interpreter=/usr/bin/python3
+ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+
+#
+# You needs to change kubeadm_token to a valid token
+# https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-token/#cmd-token-generate
+# Valid format is: "[a-z0-9]{6}.[a-z0-9]{16}"
+# 
+
+kubeadm_token=insertvalidtokenhere
+kubeadm_token_ttl=0
+
+kube_service_cidr=10.2.0.0/16
+
+# NOTE --pod-network-cidr=10.244.0.0/16 is required by flannel
+kube_pod_network_cidr=10.244.0.0/16
+
+
+
+#
+# individual servers listed here
+# this is not needed, if you have dns entries for the servers
+#
+
+[kube-node-1]
+116.203.74.136
+
+[kube-node-2]
+116.203.74.132
+
+[control-node]
+116.203.71.36
+
+
+#
+# groups of servers above
+#
+
+[kube-nodes:children]
+kube-node-1
+kube-node-2
+
+[kube-master:children]
+kube-node-1
+
+[kube-slaves:children]
+kube-node-2

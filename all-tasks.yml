@@ -1,0 +1,6 @@
+---
+- import_playbook: install/install-tools.yml
+- import_playbook: install/install-docker.yml
+- import_playbook: install/install-kubernetes.yml
+- import_playbook: install/install-kubernetes-master.yml
+- import_playbook: install/install-kubernetes-slave.yml

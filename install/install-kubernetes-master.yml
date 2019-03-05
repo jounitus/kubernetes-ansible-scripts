@@ -1,0 +1,57 @@
+#
+# Instructions: https://kubernetes.io/docs/setup/independent/install-kubeadm/
+#
+# Flannel: https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/
+#
+# kubeadm might throw following kind of errors (these can be ignored for now with --ignore-preflight-errors)
+#
+# [ERROR FileContent--proc-sys-net-ipv4-ip_forward]: /proc/sys/net/ipv4/ip_forward contents are not set to 1
+#
+# Part of these errors and warnings will be fixed later in the script
+#
+
+- hosts: kube-master
+  tasks:
+
+  - name: set net.ipv4.ip_forward = 1
+    sysctl: 
+      name: net.ipv4.ip_forward
+      value: 1
+      state: present
+  - name: test if /etc/kubernetes/admin.conf exists
+    stat:
+      path: /etc/kubernetes/admin.conf
+    register: admin_conf
+  - name: install kubeadm
+    block:
+    - name: run kubeadm init # NOTE --pod-network-cidr= is required by flannel
+      command: 'kubeadm init --service-cidr={{kube_service_cidr}}
+        --pod-network-cidr={{kube_pod_network_cidr}}
+        --token={{kubeadm_token}}
+        --token-ttl={{kubeadm_token_ttl}}
+        --ignore-preflight-errors=NumCPU,FileContent--proc-sys-net-bridge-bridge-nf-call-iptables 
+        '
+    - name: create /root/.kube directory
+      file:
+        path: /root/.kube
+        state: directory
+    - name: copy /etc/kubernetes/admin.conf to /root/.kube/config
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /root/.kube/config
+        owner: root
+        group: root
+        mode: 0660
+        remote_src: yes
+    - name: set net.bridge.bridge-nf-call-iptables = 1
+      sysctl:
+        name: net.bridge.bridge-nf-call-iptables
+        value: 1
+        state: present
+    - name: install flannel
+      command: kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/bc79dd1505b0c8681ece4de4c0d86c5cd2643275/Documentation/kube-flannel.yml
+    - name: make sure master node also runs pods (taint nodes)
+      command: kubectl taint nodes --all node-role.kubernetes.io/master-
+    when: not admin_conf.stat.exists
+
+

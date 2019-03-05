@@ -1,0 +1,53 @@
+---
+
+# Instruction: https://docs.docker.com/install/linux/docker-ce/ubuntu/
+
+- hosts: kube-nodes control-node
+  tasks:
+
+  - name: install base packages to install docker
+    apt:
+      name: "{{ packages }}"
+    vars:
+      packages:
+      - apt-transport-https
+      - ca-certificates
+      - gnupg-agent
+      - software-properties-common
+
+  - name: install docker repository key
+    apt_key:
+      url: https://download.docker.com/linux/ubuntu/gpg
+      state: present
+
+  - name: make sure docker repository is added
+    apt_repository:
+      repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable
+      state: present
+
+  - name: install docker package
+    apt:
+      name: docker-ce=18.06.1~ce~3-0~ubuntu
+
+  # install docker-compose for easy build and push
+  # https://docs.docker.com/compose/install/
+
+  - name: download docker-compose
+    get_url:
+      url: https://github.com/docker/compose/releases/download/1.23.2/docker-compose-Linux-x86_64
+      dest: /usr/local/bin/docker-compose
+
+  - name: set docker-compose -file permissions +x
+    file:
+      path: /usr/local/bin/docker-compose
+      mode: "ugo+x"
+
+  - name: create symbolic link for docker-compose
+    file:
+      src: /usr/local/bin/docker-compose
+      dest: /usr/bin/docker-compose
+      owner: root
+      group: root
+      state: link  
+
+

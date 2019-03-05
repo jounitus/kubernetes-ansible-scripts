@@ -1,0 +1,52 @@
+#
+# install aws cli, so we can login to the aws ecr docker registry
+#
+# NOTE: install aws with the pip -tool, so we can have newer version
+# of the aws tools (the old aws tool gives obsolete -e parameter for docker login)
+#
+# NOTE 2: we could also install pip with apt-get but downloading it
+# manually gives newer version of it
+
+
+- hosts: kube-nodes control-node
+  tasks:
+
+  # install pip if needed
+
+  - name: test if pip exists
+    stat:
+      path: /usr/local/bin/pip
+    register: pip_exe
+  - name: install pip
+    block:
+    - name: install python3-distutils
+      apt:
+        name: python3-distutils
+    - name: download get-pip.py
+      get_url:
+        url: https://bootstrap.pypa.io/get-pip.py
+        dest: /tmp/get-pip.py
+    - name: run get-pip.py
+      command: python3 /tmp/get-pip.py
+    when: not pip_exe.stat.exists
+
+  # install awscli
+
+  - name: install awscli
+    pip:
+      name: awscli
+
+  # install requests -library
+  # this is needed to fix errors like urllib3 (1.24.1) or chardet (3.0.4) doesn't match a supported version!
+  # https://stackoverflow.com/a/53032616
+
+  - name: install (newer version) of requests -library
+    pip:
+      name: requests>=2.21.0
+
+  # install openshift for k8s
+
+  - name: install openshift for k8s
+    pip:
+      name: openshift
+
